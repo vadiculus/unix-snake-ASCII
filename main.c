@@ -284,13 +284,7 @@ void movement(int key[2], snake_block* snake, int length, char board[][BOARD_WID
     else if (i == length-1)
       board[snake[i].current[0]][snake[i].current[1]] = ' ';
     else
-    {
-      int x = snake[i].current[0];
-      int y = snake[i].current[1];
-      if (x == 0 && y == 0)
-        return;
       board[snake[i].current[0]][snake[i].current[1]] = '#';
-    }
   }
 }
 
