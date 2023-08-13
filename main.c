@@ -154,7 +154,7 @@ int kbhit(void)
 static void finish(int sig, char* str)
 {
   endwin();
-  system("/usr/local/bin/cl.sh");
+  system("clear");
   if (sig == 1)
   {
     printf(" _       __   ____   _   __   __\n");
