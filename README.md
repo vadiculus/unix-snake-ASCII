@@ -15,6 +15,8 @@
 
 ![Screenshot](screenshot.png)
 
+## Map sizes:
+
 Small map:
 
 ![Screenshot](screenshot-sm.png)
