@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -9,10 +10,10 @@
 #define FPS_WANTED 5
 #define TIME_OF_DRAWING 1000 / FPS_WANTED
 #define MAX_APPLES 2
-#define UP_ARROW 65
-#define DOWN_ARROW 66
-#define RIGHT_ARROW 67
-#define LEFT_ARROW 68
+// #define UP_ARROW 65
+// #define DOWN_ARROW 66
+// #define RIGHT_ARROW 67
+// #define LEFT_ARROW 68
 
 int BOARD_HEIGHT = 0;
 int BOARD_WIDTH  = 0;
@@ -24,15 +25,28 @@ typedef struct snake_block
   int previous[2];
 } snake_block;
 
+typedef struct {
+  int i;
+  int j;
+} empty_block;
+
+typedef enum {
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT
+} Rotation;
+
 int kbhit(void);
 static void finish(int sig, char* str);
 void draw(int score, char board[][BOARD_WIDTH]);
-void movement(int key[2], snake_block* snake, int length, char board[][BOARD_WIDTH]);
-void generate_apple(char board[][BOARD_WIDTH]);
+void movement(Rotation rotation, snake_block* snake, int length, char board[][BOARD_WIDTH]);
+void generate_apple(int head_i, int head_j, char board[][BOARD_WIDTH]);
 snake_block create_snake_block(int cur_i, int cur_j, int pre_i, int pre_j, bool is_head);
-bool is_apple(int head_i, int head_j, char board[][BOARD_WIDTH], int key);
-bool is_death(int head_i, int head_j, char board[][BOARD_WIDTH]);
+bool is_apple(Rotation rotation, int head_i, int head_j, char board[][BOARD_WIDTH]);
+bool is_death(char board[][BOARD_WIDTH], snake_block *snake, int length);
 bool is_win(char board[][BOARD_WIDTH]);
+void change_rotation(int key, Rotation *rotation);
 
 void main(int argc, char *argv[])
 {
@@ -71,6 +85,8 @@ void main(int argc, char *argv[])
   noecho();
   nodelay(stdscr, TRUE);
   scrollok(stdscr, TRUE);
+  keypad(stdscr, TRUE);
+  // timeout(TIME_OF_DRAWING);
 
   // Create board
   char board[BOARD_HEIGHT][BOARD_WIDTH];
@@ -79,11 +95,9 @@ void main(int argc, char *argv[])
     for (int j = 0; j < BOARD_WIDTH; ++j)
       board[i][j] = ' ';
 
-  // Create apples
-  for (int i = 0; i < MAX_APPLES; ++i)
-    generate_apple(board);
-
   // Setup a snake  
+  Rotation rotation = RIGHT;
+
   int avg_i = BOARD_HEIGHT/2;
   int avg_j = BOARD_WIDTH/2;
   snake_block head = create_snake_block(avg_i, avg_j, avg_i, avg_j-1, true);
@@ -92,63 +106,46 @@ void main(int argc, char *argv[])
 
   board[avg_i][avg_j] = '$';
 
-  int key[2] = {RIGHT_ARROW, RIGHT_ARROW}; // By default right arrow key
+  // Create apples
+  for (int i = 0; i < MAX_APPLES; ++i)
+    generate_apple(snake[0].current[0], snake[0].current[1], board);
+
+  int key = 0; // By default right arrow key
   int score = 0;
   int snake_length = 2; // 1 -> is head, 2 -> is void element
+  int now, last_time;
+  now = last_time = 0;
+  int ms = 10000;
 
   while (true)
   {
-    if (kbhit())
-    {
-      // get input key
-      getch();
-      getch();
+    if ((now = clock())/ms - last_time/ms >= 100 / FPS_WANTED){ // <--- limit fps
+      last_time = now;
 
-      key[1] = key[0];
-      key[0] = getch();
+      key = getch();
 
       // check if next move on apple
-      if (is_apple(snake[0].current[0], snake[0].current[1], board, key[0]))
+
+      change_rotation(key, &rotation);
+      movement(rotation, snake, snake_length, board);
+
+      if (is_apple(rotation, snake[0].current[0], snake[0].current[1], board))
       {
-        generate_apple(board);
+        generate_apple(snake[0].current[0], snake[0].current[1], board);
         ++score;
         ++snake_length;
       }
-    }
-    else
-    {
-      movement(key, snake, snake_length, board);
+      board[snake[0].current[0]][snake[0].current[1]] = '$';
       draw(score, board);
       refresh();
-      timeout(TIME_OF_DRAWING);
 
-      if (is_apple(snake[0].current[0], snake[0].current[1], board, key[0]))
-      {
-        generate_apple(board);
-        ++score;
-        ++snake_length;
-      }
-
-      if (is_death(snake[0].current[0], snake[0].current[1], board))
+      if (is_death(board, snake, snake_length))
         finish(2, "\nFAIL. Your snake's dead...\n");
 
       if (is_win(board))
         finish(1, "\nIMPRESSIVE! You're WON!\n");
     }
   }
-}
-
-int kbhit(void)
-{
-  int ch = getch();
-
-  if (ch != ERR)
-  {
-    ungetch(ch);
-    return 1;
-  }
-  else
-    return 0;
 }
 
 static void finish(int sig, char* str)
@@ -213,61 +210,58 @@ void draw(int score, char board[][BOARD_WIDTH])
   printw("\n");
 }
 
-void movement(int key[2], snake_block* snake, int length, char board[][BOARD_WIDTH])
+void movement(Rotation rotation, snake_block* snake, int length, char board[][BOARD_WIDTH])
 {
   // copy snake
   snake_block snake_temp[length];
-  for (int i = 0; i < length; ++i)
+
+  for (int i = 0; i < length; i++)
   {
     snake_temp[i].head = false;
     snake_temp[i].current[0] = snake[i].current[0];
     snake_temp[i].current[1] = snake[i].current[1];
     snake_temp[i].previous[0] = snake[i].previous[0];
     snake_temp[i].previous[1] = snake[i].previous[1];
-    if (i == 0)
-      snake_temp[i].head = true;
   }
+
+  snake_temp[0].head = true;
+  snake[0].previous[0] = snake_temp[0].current[0];
+  snake[0].previous[1] = snake_temp[0].current[1];
+
+  if (rotation == UP) // UP
+  {
+    if (snake[0].current[0] - 1 == -1)
+      snake[0].current[0] += BOARD_HEIGHT-1;
+    else
+      snake[0].current[0] -= 1;
+  }
+  else if (rotation == DOWN)
+  {
+    if (snake[0].current[0] + 1 == BOARD_HEIGHT)
+      snake[0].current[0] -= BOARD_HEIGHT-1;
+    else
+      snake[0].current[0] += 1;
+  }
+  else if (rotation == RIGHT)
+  {
+    if (snake[0].current[1] + 1 == BOARD_WIDTH)
+      snake[0].current[1] -= BOARD_WIDTH-1;
+    else
+      snake[0].current[1] += 1;
+  }
+  else if (rotation == LEFT)
+  {
+    if (snake[0].current[1] - 1 == -1)
+      snake[0].current[1] += BOARD_WIDTH-1;
+    else
+      snake[0].current[1] -= 1;
+  }
+  
   // move each block to 1
-  int i = 0;
+  int i = 1;
+  
   while (i < length)
   {
-    if (snake[i].head == true)
-    {
-      snake[i].previous[0] = snake_temp[i].current[0];
-      snake[i].previous[1] = snake_temp[i].current[1];
-
-      if ((key[0] == UP_ARROW && key[1] == DOWN_ARROW) || key[0] == UP_ARROW) // UP
-      {
-        if (snake[i].current[0] - 1 == -1)
-          snake[i].current[0] += BOARD_HEIGHT-1;
-        else
-          snake[i].current[0] -= 1;
-      }
-      else if ((key[0] == DOWN_ARROW && key[1] == UP_ARROW) || key[0] == DOWN_ARROW)
-      {
-        if (snake[i].current[0] + 1 == BOARD_HEIGHT)
-          snake[i].current[0] -= BOARD_HEIGHT-1;
-        else
-          snake[i].current[0] += 1;
-      }
-      else if ((key[0] == RIGHT_ARROW && key[1] == LEFT_ARROW) || key[0] == RIGHT_ARROW)
-      {
-        if (snake[i].current[1] + 1 == BOARD_WIDTH)
-          snake[i].current[1] -= BOARD_WIDTH-1;
-        else
-          snake[i].current[1] += 1;
-      }
-      else if ((key[0] == LEFT_ARROW && key[1] == RIGHT_ARROW) || key[0] == LEFT_ARROW)
-      {
-        if (snake[i].current[1] - 1 == -1)
-          snake[i].current[1] += BOARD_WIDTH-1;
-        else
-          snake[i].current[1] -= 1;
-      }
-
-      ++i;
-      continue;
-    }
     snake[i].current[0] = snake[i-1].previous[0];
     snake[i].current[1] = snake[i-1].previous[1];
     snake[i].previous[0] = snake_temp[i].current[0];
@@ -276,36 +270,42 @@ void movement(int key[2], snake_block* snake, int length, char board[][BOARD_WID
   }
 
   // Draw snake
-  for (int i = 0; i < length; ++i)
+  for (int i = 1; i < length; ++i)
   {
-    if (i == 0)
-      board[snake[i].current[0]][snake[i].current[1]] = '$';
-    
-    else if (i == length-1)
-      board[snake[i].current[0]][snake[i].current[1]] = ' ';
-    else
-      board[snake[i].current[0]][snake[i].current[1]] = '#';
+    board[snake[i].current[0]][snake[i].current[1]] = '#';
   }
+
+  board[snake[length-1].current[0]][snake[length-1].current[1]] = ' ';
 }
 
-void generate_apple(char board[][BOARD_WIDTH])
+void change_rotation(int key, Rotation *rotation){
+  if (key == KEY_UP && *rotation != DOWN) // UP
+    *rotation = UP;
+  else if (key == KEY_DOWN && *rotation != UP)
+    *rotation = DOWN;
+  else if (key == KEY_LEFT && *rotation != RIGHT)
+    *rotation = LEFT;
+  else if (key == KEY_RIGHT && *rotation != LEFT)
+    *rotation = RIGHT;
+}
+
+void generate_apple(int head_i, int head_j, char board[][BOARD_WIDTH])
 {
   int apples_amount = 0;
-  for (int i = 0; i < BOARD_HEIGHT; ++i)
-    for (int j = 0; j < BOARD_WIDTH; ++j)
-      if (board[i][j] == '*')
-        ++apples_amount;
-  
-  if (apples_amount <= MAX_APPLES)
-  {
-    int i = rand() % BOARD_HEIGHT;
-    int j = rand() % BOARD_WIDTH;
-  
-    if (board[i][j] != ' ')
-      generate_apple(board);
-    else
-      board[i][j] = '*';
+  empty_block empt_blocks[BOARD_HEIGHT * BOARD_WIDTH];
+  for (int i = 0; i < BOARD_HEIGHT; ++i){
+    for (int j = 0; j < BOARD_WIDTH; ++j){
+      if (board[i][j] == ' ' && (i != head_i && j != head_j)){
+        empt_blocks[apples_amount].i = i;
+        empt_blocks[apples_amount].j = j;
+        apples_amount++;
+      }
+    }
   }
+
+  int i = rand() % apples_amount;
+  board[empt_blocks[i].i][empt_blocks[i].j] = '*';
+
 }
 
 snake_block create_snake_block(int cur_i, int cur_j, int pre_i, int pre_j, bool is_head)
@@ -319,22 +319,20 @@ snake_block create_snake_block(int cur_i, int cur_j, int pre_i, int pre_j, bool 
   return result;
 }
 
-bool is_apple(int head_i, int head_j, char board[][BOARD_WIDTH], int key)
+bool is_apple(Rotation rotation, int head_i, int head_j, char board[][BOARD_WIDTH])
 {
-  if (
-    (key == UP_ARROW && board[head_i-1][head_j] == '*') ||
-    (key == DOWN_ARROW && board[head_i+1][head_j] == '*') ||
-    (key == RIGHT_ARROW && board[head_i][head_j+1] == '*') || 
-    (key == LEFT_ARROW && board[head_i][head_j-1] == '*') 
+  if (board[head_i][head_j] == '*'
   ) return true;
-
+  
   return false;
 }
 
-bool is_death(int head_i, int head_j, char board[][BOARD_WIDTH])
+bool is_death(char board[][BOARD_WIDTH], snake_block *snake, int length)
 {
-  if (board[head_i][head_j] == '#')
-    return true;
+  for (int i = 1; i < length; i++){
+    if (snake[0].current[0] == snake[i].current[0] && snake[0].current[1] == snake[i].current[1])
+      return true;
+  }
   return false;
 }
 
