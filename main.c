@@ -86,7 +86,6 @@ void main(int argc, char *argv[])
   nodelay(stdscr, TRUE);
   scrollok(stdscr, TRUE);
   keypad(stdscr, TRUE);
-  // timeout(TIME_OF_DRAWING);
 
   // Create board
   char board[BOARD_HEIGHT][BOARD_WIDTH];
@@ -123,12 +122,12 @@ void main(int argc, char *argv[])
       last_time = now;
 
       key = getch();
-
-      // check if next move on apple
+      flushinp();
 
       change_rotation(key, &rotation);
       movement(rotation, snake, snake_length, board);
 
+      // check if next move on apple
       if (is_apple(rotation, snake[0].current[0], snake[0].current[1], board))
       {
         generate_apple(snake[0].current[0], snake[0].current[1], board);
