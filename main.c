@@ -9,7 +9,7 @@
 #define MAX_BOARD_WIDTH 30
 #define FPS_WANTED 7
 #define TIME_OF_DRAWING 1000 / FPS_WANTED
-#define MAX_APPLES 5
+#define MAX_APPLES 2
 
 int BOARD_HEIGHT = 0;
 int BOARD_WIDTH  = 0;
