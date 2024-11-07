@@ -7,13 +7,9 @@
 
 #define MAX_BOARD_HEIGHT 24
 #define MAX_BOARD_WIDTH 30
-#define FPS_WANTED 5
+#define FPS_WANTED 7
 #define TIME_OF_DRAWING 1000 / FPS_WANTED
-#define MAX_APPLES 2
-// #define UP_ARROW 65
-// #define DOWN_ARROW 66
-// #define RIGHT_ARROW 67
-// #define LEFT_ARROW 68
+#define MAX_APPLES 5
 
 int BOARD_HEIGHT = 0;
 int BOARD_WIDTH  = 0;
@@ -100,11 +96,10 @@ void main(int argc, char *argv[])
   int avg_i = BOARD_HEIGHT/2;
   int avg_j = BOARD_WIDTH/2;
   snake_block head = create_snake_block(avg_i, avg_j, avg_i, avg_j-1, true);
-  snake_block imaginary_block = create_snake_block(avg_i, avg_j-1, avg_i, avg_j-2, false);
-  snake_block snake[MAX_BOARD_HEIGHT*MAX_BOARD_WIDTH] = {head, imaginary_block};
+  // snake_block imaginary_block = create_snake_block(avg_i, avg_j-1, avg_i, avg_j-2, false);
+  snake_block snake[MAX_BOARD_HEIGHT*MAX_BOARD_WIDTH] = {head};
 
   board[avg_i][avg_j] = '$';
-
   // Create apples
   for (int i = 0; i < MAX_APPLES; ++i)
     generate_apple(snake[0].current[0], snake[0].current[1], board);
@@ -134,15 +129,17 @@ void main(int argc, char *argv[])
         ++score;
         ++snake_length;
       }
-      board[snake[0].current[0]][snake[0].current[1]] = '$';
-      draw(score, board);
-      refresh();
 
       if (is_death(board, snake, snake_length))
         finish(2, "\nFAIL. Your snake's dead...\n");
 
       if (is_win(board))
         finish(1, "\nIMPRESSIVE! You're WON!\n");
+
+      board[snake[0].current[0]][snake[0].current[1]] = '$';
+
+      draw(score, board);
+      refresh();
     }
   }
 }
@@ -266,6 +263,7 @@ void movement(Rotation rotation, snake_block* snake, int length, char board[][BO
     snake[i].previous[0] = snake_temp[i].current[0];
     snake[i].previous[1] = snake_temp[i].current[1];
     ++i;
+
   }
 
   // Draw snake
@@ -328,10 +326,8 @@ bool is_apple(Rotation rotation, int head_i, int head_j, char board[][BOARD_WIDT
 
 bool is_death(char board[][BOARD_WIDTH], snake_block *snake, int length)
 {
-  for (int i = 1; i < length; i++){
-    if (snake[0].current[0] == snake[i].current[0] && snake[0].current[1] == snake[i].current[1])
-      return true;
-  }
+  if (board[snake[0].current[0]][snake[0].current[1]] == '#')
+    return true;
   return false;
 }
 
